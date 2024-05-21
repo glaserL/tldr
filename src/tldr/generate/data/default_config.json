@@ -1,0 +1,16 @@
+{
+  "generation_parameters": {
+    "top_p": 0.6,
+    "do_sample": true,
+    "top_k": 56,
+    "max_new_tokens": 44,
+    "temperature": 0.6,
+    "penalty_alpha": 0.02
+  },
+  "prompt_config": {
+    "prompt": "Generate a sentence from the following semantic parse:",
+    "tokenize": false,
+    "add_generation_prompt": false
+  },
+  "model_name": "mistralai/Mistral-7B-Instruct-v0.2"
+}

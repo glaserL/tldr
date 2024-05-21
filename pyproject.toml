@@ -1,0 +1,66 @@
+[project]
+name = "tldr"
+version = "0.1.0"
+description = "Abstractive Text Summarization using Sentential Semantics."
+authors = [{ name = "Luis Glaser", email = "Luis.Glaser@em.uni-frankfurt.de" }]
+readme = "README.md"
+license = { file = "LICENSE" }
+classifiers = ["Private :: Do not Upload"]
+requires-python = ">=3.9"
+dependencies = [
+    "pandas",
+    "transformers",
+    "pynvml",
+    "torchinfo",
+    "tqdm",
+    "nltk",
+    "accelerate",
+    "datasets",
+    "networkx",
+]
+
+[project.scripts]
+tldr = "tldr.entry:run"
+
+[project.optional-dependencies]
+dev = ["ruff>=0.2", "pytest"]
+train = [
+    "timeout_decorator>=0.5",
+    "mlflow",
+    "optuna",
+    "seqeval",
+    "rouge-score",
+    "evaluate",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+#log_cli = true
+#log_cli_level = "DEBUG"
+markers = [
+    "needs_gpu: the test requires (strong) GPU. Can be skipped in workflows. (deselect with '-m \"not needs_gpu\"')",
+]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tldr"]
+section-order = [
+    "future",
+    "typing",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.isort.sections]
+"typing" = ["typing"]

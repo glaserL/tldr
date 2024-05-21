@@ -1,0 +1,19 @@
+# Mac
+*DS_Store
+
+# python stuffs
+*.pyc
+*__pycache__
+*.egg-info
+
+# Model stuff
+*.bin
+*.pt
+*checkpoint-*
+mlruns*
+output*
+*.arrow
+*.aim
+
+# Why is this even here
+*.cache
