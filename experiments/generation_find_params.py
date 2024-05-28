@@ -144,7 +144,7 @@ def objective(trial) -> float:
 
 def main():
     experiment = setup_mlflow_experiment(
-        "generation/regenerate-gold-data",
+        "generation/regenerate-gold-data-v2",
         "Trying different generation configurations to recreate SRL parses.",
     )
     study = optuna.create_study(

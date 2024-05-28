@@ -1,6 +1,6 @@
 [project]
 name = "tldr"
-version = "0.1.0"
+version = "0.1.1"
 description = "Abstractive Text Summarization using Sentential Semantics."
 authors = [{ name = "Luis Glaser", email = "Luis.Glaser@em.uni-frankfurt.de" }]
 readme = "README.md"

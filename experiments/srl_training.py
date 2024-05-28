@@ -2,10 +2,10 @@ MODELS = [
     "distilbert/distilbert-base-uncased",
     "distilbert/distilbert-base-cased",
     # "facebook/bart-large", its a bart not bert
-    "albert/albert-base-v2",
-    "bert-base-cased",
+    # "albert/albert-base-v2",
+    # "bert-base-cased",
     # "martincc98/srl_bert_advanced", Probably risky
-    "prajjwal1/bert-tiny",
+    #"prajjwal1/bert-tiny",
     # "YituTech/conv-bert-base", # Broken Vocab
     "google/mobilebert-uncased",
 ]
@@ -40,7 +40,7 @@ def suggest_args(trial: optuna.Trial, task: str):
     lr_scheduler_type = trial.suggest_categorical(
         "lr_scheduler_type", ["linear", "polynomial"]
     )
-    warmup_steps = trial.suggest_int("warmup_steps", 100, 1000, step=100)
+    warmup_steps = trial.suggest_int("warmup_steps", 100, 1000, step=300)
     early_stopping_patience = trial.suggest_int("early_stopping_patience", 3, 10)
     corpus = ["/home/lglaser/Developer/shallow-srl/data/export"]
     custom_args = CustomArguments(
@@ -51,6 +51,7 @@ def suggest_args(trial: optuna.Trial, task: str):
         base_model=model,
         early_stopping_patience=early_stopping_patience,
         verbose=False,
+        num_proc=6
     )
     training_args = TrainingArguments(
         "output",
@@ -58,7 +59,7 @@ def suggest_args(trial: optuna.Trial, task: str):
         do_eval=True,
         evaluation_strategy="epoch",
         save_strategy="epoch",
-        logging_steps=5000,
+        logging_steps=500,
         metric_for_best_model="eval_loss",
         save_total_limit=2,
         per_device_eval_batch_size=batch_size,
@@ -90,15 +91,20 @@ def main(task: str):
         study_name="srl_training", directions=["minimize", "maximize"]
     )
     study.optimize(
-        lambda trial: objective(trial, task), n_trials=5, show_progress_bar=True
+        lambda trial: objective(trial, task), n_trials=10, show_progress_bar=True
     )
 
+    print("Best Trials: ")
+    print(study.best_trials)
+
     for trial in study.best_trials:
+        print(f"Best trial")
 
         mark_as_champion(trial)
 
     img = optuna.visualization.plot_pareto_front(study)
-    mlflow.log_figure("pareto.png", img)
+    with mlflow.start_run(run_name="LOGGING PARENTO FOR {task}"):
+        mlflow.log_figure("pareto.png", img)
 
 
 if __name__ == "__main__":

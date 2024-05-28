@@ -36,6 +36,11 @@ git clone https://github.com/glaserL/tldr && cd tldr
 pip install -e ".[dev, train]"
 ```
 
+## INTERNAL
+on neuron you'll need to use an old torch version. after installing swap torch:
+`pip install torch==1.12.1+cu102 --extra-index-url https://download.pytorch.org/whl/cu102`
+note it might work with `pip install -e . --extra-index-url https://download.pytorch.org/whl/cu102`
+
 ## Structure
 
 The project is split into 5 CHECK
