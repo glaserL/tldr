@@ -95,6 +95,25 @@ def juggle_dataset(dataset: Union[DatasetDict, Dataset, Path]) -> DatasetDict:
     logger.info(f"Loaded dataset {dataset}")
     return dataset
 
+def recover_args_and_inject_pred(tokenizer, input_ids, arg_ids, id2label):
+    tmp_toks, tmp_args = [], []
+    foo = tokenizer.decode(input_ids, skip_special_tokens=True)
+    bar = tokenizer(foo, return_offsets_mapping=True)
+    baz = [(foo[i:j], arg_ids[a]) for a, (i, j) in enumerate(bar["offset_mapping"])]
+    prev = ""
+    for token, anno in baz:
+        
+        if prev == ">":
+            might_append = "PRED"
+        else:
+            might_append = id2label[anno]
+        prev = token
+        if not len(token) or token in [">", "<"]:
+            continue
+        tmp_toks.append(token)
+        tmp_args.append(might_append)
+    return tmp_toks, tmp_args
+
 
 def infer_args(dataset: DatasetDict, args_run: Run):
     trainer = load_trainer_from_run(args_run)
@@ -103,15 +122,8 @@ def resolve_args(annos, id2label, tokenizer, begin, end):
     resolved_tokens = []
     resolved_args = []
     for input_ids, arg_ids in zip(annos["input_ids"], annos["arg_ids"]):
-        tmp_toks, tmp_args = [], []
-        for i, a in zip(input_ids, arg_ids):
-            if i in tokenizer.all_special_ids:
-                continue
-            if i == begin or i == end:
-                continue
-
-            tmp_toks.append(tokenizer.convert_ids_to_tokens(i))
-            tmp_args.append(id2label[a])
+        tmp_toks, tmp_args = recover_args_and_inject_pred(tokenizer, input_ids, arg_ids, id2label)
+        
         resolved_tokens.append(tmp_toks)
         resolved_args.append(tmp_args)
 
@@ -209,6 +221,7 @@ def infer_pred2(dataset: DatasetDict, trainer: Trainer, device: str):
 
             sents = []
             new_attentions = []
+            new_word_ids = []
             for i in indices:
                 if i < len(word_idxs):
 

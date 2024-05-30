@@ -1,17 +1,19 @@
 MODELS = [
     "distilbert/distilbert-base-uncased",
-    "distilbert/distilbert-base-cased",
+    # "distilbert/distilbert-base-cased",
     # "facebook/bart-large", its a bart not bert
     # "albert/albert-base-v2",
     # "bert-base-cased",
     # "martincc98/srl_bert_advanced", Probably risky
     #"prajjwal1/bert-tiny",
     # "YituTech/conv-bert-base", # Broken Vocab
-    "google/mobilebert-uncased",
+    # "google/mobilebert-uncased",
 ]
 
 
 from argparse import ArgumentParser
+from pathlib import Path
+import os
 
 import mlflow
 import optuna
@@ -42,7 +44,9 @@ def suggest_args(trial: optuna.Trial, task: str):
     )
     warmup_steps = trial.suggest_int("warmup_steps", 100, 1000, step=300)
     early_stopping_patience = trial.suggest_int("early_stopping_patience", 3, 10)
-    corpus = ["/home/lglaser/Developer/shallow-srl/data/export"]
+    base = Path("/home/lglaser/Developer/shallow-srl/data/export")
+    os.environ["HF_MLFLOW_LOG_ARTIFACTS"] = "true"
+    corpus = [base / "ewt", base / "ibm-propbank", base / "framenet", base / "streusle", base / "amr"]
     custom_args = CustomArguments(
         task=task,
         corpus=corpus,
@@ -54,14 +58,14 @@ def suggest_args(trial: optuna.Trial, task: str):
         num_proc=6
     )
     training_args = TrainingArguments(
-        "output",
+        "output/final_arg",
         do_train=True,
         do_eval=True,
         evaluation_strategy="epoch",
         save_strategy="epoch",
         logging_steps=500,
         metric_for_best_model="eval_loss",
-        save_total_limit=2,
+        save_total_limit=8,
         per_device_eval_batch_size=batch_size,
         per_device_train_batch_size=batch_size,
         optim="adamw_torch",
@@ -88,7 +92,7 @@ def objective(trial, task) -> float:
 
 def main(task: str):
     study = optuna.create_study(
-        study_name="srl_training", directions=["minimize", "maximize"]
+        study_name="srl_training", directions=["minimize", "maximize"]#, storage=f"sqlite:///optuna_{task}.db"
     )
     study.optimize(
         lambda trial: objective(trial, task), n_trials=10, show_progress_bar=True
