@@ -35,5 +35,19 @@ def main():
         evaluate_summarization(dataset["summarizations"], dataset["highlights"], True)
 
 
+def main():
+    from pathlib import Path
+
+    experiment_name = Path(__file__).stem
+
+    setup_mlflow_experiment(experiment_name)
+
+    study = optuna.create_study(study_name=experiment_name, direction="maximize")
+    study.optimize(
+        objective, n_trials=3, callbacks=[champion_callback], show_progress_bar=True
+    )
+
+
 if __name__ == "__main__":
+
     main()
