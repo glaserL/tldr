@@ -32,17 +32,21 @@ seqeval = evaluate.load("seqeval")
 f1 = evaluate.load("f1")
 logger = logging.getLogger(__name__)
 
-
 def store_best_model(trainer: Trainer):
     ckpt_dir = trainer.state.best_model_checkpoint
 
     logger.info(f"Logging checkpoint artifacts in {ckpt_dir}. This may take time.")
+    try:
 
-    mlflow.pyfunc.log_model(
-        ckpt_dir,
-        artifacts={"model_path": ckpt_dir},
-        python_model=mlflow.pyfunc.PythonModel(),
-    )
+        mlflow.pyfunc.log_model(
+            ckpt_dir,
+            artifacts={"model_path": ckpt_dir},
+            python_model=mlflow.pyfunc.PythonModel(),
+        )
+    except mlflow.MlflowException as e:
+        logger.warning(f"Couldn't store best model because of {e}")
+        logger.warning(f"See if you can find a model at {ckpt_dir}!")
+
 
 
 @dataclass
