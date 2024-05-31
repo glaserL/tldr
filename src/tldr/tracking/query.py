@@ -69,3 +69,10 @@ def get_model(task):
     if not len(models):
         raise TypeError(f"No registered model for task {task}.")
     return models[0]
+
+def get_champion(task):
+    client = mlflow.MlflowClient()
+    model = client.get_model_version_by_alias(task,'champion')
+    if not model:
+        raise TypeError(f"No registered champion for task {task}.")
+    return model

@@ -1,6 +1,7 @@
 from tldr.data.alice_and_bob import get_raw_text
 from tldr.srl.inference import SRLParser
 from tldr.srl.util import load_trainer_from_path
+from tldr.tracking.main import newest_srl_parser
 
 from .conftest import srl_args_path, srl_pred_path
 
@@ -15,6 +16,12 @@ def test_inference():
 
     sent_ids = [row["sent_id"] for row in parsed]
     assert len(set(sent_ids)) == 7, "There should be 7 sentences in the parsed graph."
+
+def test_champions():
+    text = "I like strawberries very much!"
+    parser = newest_srl_parser()
+    result = parser.parse(text)
+    
 
 
 def test_parser_creation_from_local_path():

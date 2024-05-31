@@ -9,7 +9,7 @@ from transformers import set_seed
 
 from tldr.srl.inference import SRLParser
 from tldr.srl.util import load_trainer_from_run, load_trainer_via_model_info
-from tldr.tracking.query import get_model, get_run_by_run_name
+from tldr.tracking.query import get_champion, get_model, get_run_by_run_name
 
 TRACKING_URI = "http://localhost:5000"
 logger = logging.getLogger(__name__)
@@ -51,8 +51,8 @@ class SRLParserFromMLflow(SRLParser):
 
 
 def newest_srl_parser():
-    pred = get_model("SRL-pred")
-    args = get_model("SRL-args")
+    pred = get_champion("SRL-pred")
+    args = get_champion("SRL-args")
     return SRLParser(
         load_trainer_via_model_info(pred), load_trainer_via_model_info(args)
     )

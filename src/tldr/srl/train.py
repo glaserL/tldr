@@ -32,17 +32,21 @@ seqeval = evaluate.load("seqeval")
 f1 = evaluate.load("f1")
 logger = logging.getLogger(__name__)
 
-
 def store_best_model(trainer: Trainer):
     ckpt_dir = trainer.state.best_model_checkpoint
 
     logger.info(f"Logging checkpoint artifacts in {ckpt_dir}. This may take time.")
+    try:
 
-    mlflow.pyfunc.log_model(
-        ckpt_dir,
-        artifacts={"model_path": ckpt_dir},
-        python_model=mlflow.pyfunc.PythonModel(),
-    )
+        mlflow.pyfunc.log_model(
+            ckpt_dir,
+            artifacts={"model_path": ckpt_dir},
+            python_model=mlflow.pyfunc.PythonModel(),
+        )
+    except mlflow.MlflowException as e:
+        logger.warning(f"Couldn't store best model because of {e}")
+        logger.warning(f"See if you can find a model at {ckpt_dir}!")
+
 
 
 @dataclass
@@ -68,6 +72,7 @@ class CustomArguments:
     verbose: bool = field(default=False)
     debug: bool = field(default=False)
     inflate_training_data: bool = field(default=False)
+    num_proc: int = field(default=14)
     task: str = field(
         default="both",
         metadata={
@@ -216,8 +221,10 @@ def extract_pred_data(f: Iterator[str]):
                     labels.add(pred)
                     buffer.append((word, pred))
     if len(buffer) > 0:
-        buffer = zip([w for w, _ in buffer], [str(p) for _, p in buffer])
-
+        buffer = [
+                [w for w, _ in buffer],
+                [p for _, p in buffer],
+            ]
         data.append({"text": buffer[0], "labels": buffer[1]})
     
     return labels, data
@@ -356,7 +363,7 @@ def run_experiment(
             lambda ex: tokenize_and_align_labels(ex, tokenizer),
             remove_columns=["text"],
             batched=True,
-            num_proc=12,
+            num_proc=custom_args.num_proc,
             desc="Tokenizing..",
         )
 
@@ -401,13 +408,13 @@ def run_experiment(
             p, id2label, log_table=True
         )
         _, _, metrics = trainer.predict(
-            dataset["test"], metric_key_prefix="predict"
+            dataset["test"], metric_key_prefix="test"
         )
 
         mlflow.log_metrics(metrics)
 
 
-        return metrics["predict_loss"], metrics["predict_f1"]
+        return metrics["test_loss"], metrics["test_f1"]
 
 
 
@@ -423,6 +430,7 @@ def parse_args():
 def run(
     training_args: Optional[TrainingArguments] = None,
     custom_args: Optional[CustomArguments] = None,
+    prefix="ssrl",
 ):
 
     if training_args is None or custom_args is None:
@@ -454,20 +462,20 @@ def run(
     if task == "pred":
         if use_mlflow:
             experiment = setup_mlflow_experiment(
-                f"acoli-srl/{task}/optimatest", pred_description
+                f"{prefix}/{task}", pred_description
             )
         return run_experiment(experiment.name, training_args, custom_args)
     elif task == "args":
         if use_mlflow:
             experiment = setup_mlflow_experiment(
-                f"acoli-srl/{task}/optimatest", args_description
+                f"{prefix}/{task}", args_description
             )
         return run_experiment(experiment.name, training_args, custom_args)
     elif task == "both":
 
         if use_mlflow:
             experiment = setup_mlflow_experiment(
-                "acoli-srl/pred/optimatest", pred_description
+                f"{prefix}/{task}", pred_description
             )
         custom_args.task = "pred"
         corpus_files = custom_args.corpus[:]
@@ -475,7 +483,7 @@ def run(
 
         if use_mlflow:
             experiment = setup_mlflow_experiment(
-                "acoli-srl/args/optimatest", args_description
+                f"{prefix}/{task}", args_description
             )
         custom_args.task = "args"
         custom_args.corpus = corpus_files

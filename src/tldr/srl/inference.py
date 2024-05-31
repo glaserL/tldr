@@ -1,4 +1,4 @@
-from typing import Union
+from typing import List, Literal, Union
 
 import logging
 from collections import defaultdict
@@ -87,7 +87,7 @@ def juggle_dataset(dataset: Union[DatasetDict, Dataset, Path]) -> DatasetDict:
         dataset = dataset
     else:
         raise TypeError(f"Unsupported dataset type {type(dataset)}")
- 
+
     if "highlights" in dataset.column_names:
         dataset = dataset.remove_columns(["highlights"])
     ##### PREPARE FOR PREDICATE TASK #####
@@ -96,9 +96,46 @@ def juggle_dataset(dataset: Union[DatasetDict, Dataset, Path]) -> DatasetDict:
     return dataset
 
 
+def recover_args_and_inject_pred(tokenizer, input_ids, arg_ids, id2label):
+    tmp_toks, tmp_args = [], []
+    foo = tokenizer.decode(input_ids, skip_special_tokens=True)
+    bar = tokenizer(foo, return_offsets_mapping=True)
+    baz = [(foo[i:j], arg_ids[a]) for a, (i, j) in enumerate(bar["offset_mapping"])]
+    prev = ""
+    for token, anno in baz:
+
+        if prev == ">":
+            might_append = "PRED"
+        else:
+            might_append = id2label[anno]
+        prev = token
+        if not len(token) or token in [">", "<"]:
+            continue
+        tmp_toks.append(token)
+        tmp_args.append(might_append)
+    return tmp_toks, tmp_args
+
+
 def infer_args(dataset: DatasetDict, args_run: Run):
     trainer = load_trainer_from_run(args_run)
     return infer_args2(dataset, trainer, "cuda")
+
+
+def resolve_args(annos, id2label, tokenizer, begin, end):
+    resolved_tokens = []
+    resolved_args = []
+    for input_ids, arg_ids in zip(annos["input_ids"], annos["arg_ids"]):
+        tmp_toks, tmp_args = recover_args_and_inject_pred(
+            tokenizer, input_ids, arg_ids, id2label
+        )
+
+        resolved_tokens.append(tmp_toks)
+        resolved_args.append(tmp_args)
+
+    annos["args"] = resolved_args
+    annos["tokens"] = resolved_tokens
+
+    return annos
 
 
 def infer_args2(dataset: DatasetDict, trainer: Trainer, device: str):
@@ -116,26 +153,6 @@ def infer_args2(dataset: DatasetDict, trainer: Trainer, device: str):
     ##### POST PROCESS ARGUMENTS TASK #####
 
     ##### RUNNING ARGUMENTS TASK #####
-    def resolve_args(annos, id2label, tokenizer, begin, end):
-        resolved_tokens = []
-        resolved_args = []
-        for input_ids, arg_ids in zip(annos["input_ids"], annos["arg_ids"]):
-            tmp_toks, tmp_args = [], []
-            for i, a in zip(input_ids, arg_ids):
-                if i in tokenizer.all_special_ids:
-                    continue
-                if i == begin or i == end:
-                    continue
-
-                tmp_toks.append(tokenizer.convert_ids_to_tokens(i))
-                tmp_args.append(id2label[a])
-            resolved_tokens.append(tmp_toks)
-            resolved_args.append(tmp_args)
-
-        annos["args"] = resolved_args
-        annos["tokens"] = resolved_tokens
-
-        return annos
 
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     for splt in dataset.keys():
@@ -209,6 +226,7 @@ def infer_pred2(dataset: DatasetDict, trainer: Trainer, device: str):
 
             sents = []
             new_attentions = []
+            new_word_ids = []
             for i in indices:
                 if i < len(word_idxs):
 
@@ -292,6 +310,36 @@ class SRLParser:
     def __init__(self, pred_trainer: Trainer, args_trainer: Trainer) -> None:
         self.pred_trainer = pred_trainer
         self.args_trainer = args_trainer
+        if pred_trainer.tokenizer.vocab_size != args_trainer.tokenizer.vocab_size:
+            raise TypeError(
+                "Missmatched vocab size, are you sure the base models are equal?"
+            )
+
+    def parse_dataset(
+        self,
+        dataset,
+        pred_device="cuda:0",
+        args_device="cuda:1",
+        tasks: List[Literal["pred", "args"]] = None,
+    ):
+        if tasks is None:
+            tasks = ["pred", "args"]
+        dataset = juggle_dataset(dataset)
+
+        if "pred" in tasks:
+
+            dataset = infer_pred2(dataset, self.pred_trainer, pred_device)
+        if "args" in tasks:
+            dataset = infer_args2(dataset, self.args_trainer, args_device)
+        else:
+
+            def do_thing(ex, tokenizer):
+                ex["tokens"] = tokenizer.convert_ids_to_tokens(ex["input_ids"])
+                return ex
+
+            dataset = dataset.map(lambda ex: do_thing(ex, self.pred_trainer.tokenizer))
+
+        return dataset
 
     def parse(
         self,
@@ -299,19 +347,18 @@ class SRLParser:
         do_split_into_sentences=False,
         pred_device="cuda:0",
         args_device="cuda:1",
+        tasks: List[Literal["pred", "args"]] = None,
     ) -> Dataset:
         if do_split_into_sentences:
             dataset = Dataset.from_list([{"text": sent_tokenize(text), "id": 0}])
 
         else:
             dataset = Dataset.from_list([{"text": [text], "id": 0}])
-        dataset = juggle_dataset(dataset)
 
-        dataset = infer_pred2(dataset, self.pred_trainer, pred_device)
-        dataset = infer_args2(dataset, self.args_trainer, args_device)
+        dataset = self.parse_dataset(dataset, pred_device, args_device, tasks)
         dataset = dataset[list(dataset.keys())[0]]
         return dataset
-    
+
     @classmethod
     def from_paths(cls, pred_path: Path, args_path: Path):
         pred_trainer = load_trainer_from_path(pred_path)

@@ -45,6 +45,45 @@ def lloyd_wright(sentence: SentenceGraph):
     return result
 
 
+def _hadid(subgraph):
+    result = []
+    for arg, vals in subgraph.items():
+        rprr = f'"{arg}": "' + " ".join(t.value for t in vals) + '"'
+        result.append(rprr)
+    return ", ".join(result)
+
+
+def hadid(sentence: SentenceGraph):
+    result = "\n".join([_hadid(g) for g in sentence.subgraphs])
+    return f"{{{result}}}"
+
+
+def _calatrava(subgraph):
+    result = []
+    for arg, vals in subgraph.items():
+        rprr = f"{arg}: " + " ".join(t.value for t in vals)
+        result.append(rprr)
+    return " ".join(result)
+
+
+def calatrava(sentence: SentenceGraph):
+    result = "\n".join([_calatrava(g) for g in sentence.subgraphs])
+    return result
+
+
+def _libeskind(subgraph):
+    result = []
+    for arg, vals in subgraph.items():
+        rprr = " ".join(t.value for t in vals) + f": {arg}"
+        result.append(rprr)
+    return " ".join(result)
+
+
+def libeskind(sentence: SentenceGraph):
+    result = "\n".join([_libeskind(g) for g in sentence.subgraphs])
+    return result
+
+
 class Serializer:
 
     def __init__(self) -> None:
@@ -85,10 +124,27 @@ class Hundertwasser(Serializer):
         return hundertwasser(sentence, True)
 
 
+class Hadid(Serializer):
+    def _serialize(self, sentence: SentenceGraph) -> str:
+        return hadid(sentence)
+
+
+class Libeskind(Serializer):
+    def _serialize(self, sentence: SentenceGraph) -> str:
+        return libeskind(sentence)
+
+
+class Calatrava(Serializer):
+    def _serialize(self, sentence: SentenceGraph) -> str:
+        return calatrava(sentence)
+
+
 serializer_mapping = {
     "hundertwasser": Hundertwasser,
-    # "gropius": gropius,
+    "hadid": Hadid,
     "lloyd_wright": LloydWright,
+    "libeskind": Libeskind,
+    "calatrava": Calatrava,
 }
 
 
